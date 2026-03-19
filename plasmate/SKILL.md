@@ -1,6 +1,35 @@
 ---
 name: plasmate
 description: Browse the web via Plasmate, a fast headless browser engine for agents. Compiles HTML into a Semantic Object Model (SOM) - 50x faster than Chrome, 10x fewer tokens. Supports AWP (Agent Web Protocol) and CDP compatibility. Optional authenticated browsing uses locally encrypted cookie profiles that never leave the user's machine.
+homepage: https://plasmate.app
+metadata:
+  {
+    "openclaw":
+      {
+        "emoji": "⚡",
+        "source": "https://github.com/plasmate-labs/plasmate",
+        "license": "Apache-2.0",
+        "privacy": "https://plasmate.app/privacy",
+        "requires": { "bins": ["plasmate"] },
+        "install":
+          [
+            {
+              "id": "curl",
+              "kind": "shell",
+              "command": "curl -fsSL https://plasmate.app/install.sh | sh",
+              "bins": ["plasmate"],
+              "label": "Install Plasmate (shell script)",
+            },
+            {
+              "id": "cargo",
+              "kind": "shell",
+              "command": "cargo install plasmate",
+              "bins": ["plasmate"],
+              "label": "Install Plasmate (cargo)",
+            },
+          ],
+      },
+  }
 ---
 
 # Plasmate - Browser Engine for Agents
