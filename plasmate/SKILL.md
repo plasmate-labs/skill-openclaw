@@ -164,6 +164,53 @@ Use ref IDs from `interactive` elements for click/type actions.
 | Memory (100 pages) | ~30 MB | ~20 GB |
 | Output size | SOM (10-800x smaller) | Raw HTML |
 
+## Agent-Driven Auth Flow (Guided Setup)
+
+When a user asks you to browse a site that requires login (e.g., "check my X mentions"),
+and no profile exists for that domain, follow this flow:
+
+### Step 1: Install plasmate if needed
+```bash
+which plasmate || curl -fsSL https://plasmate.app/install.sh | sh
+```
+
+### Step 2: Check if profile exists
+```bash
+plasmate auth list
+# If domain shows up with ✓, skip to browsing
+```
+
+### Step 3: Start bridge and wait for cookies
+```bash
+# Start bridge in background
+plasmate auth serve &
+
+# Tell the user:
+# "I need access to your [site] account. Two things:
+#  1. Install the Plasmate extension: https://chromewebstore.google.com/detail/plasmate/[id]
+#     (or from github.com/plasmate-labs/plasmate-extension)
+#  2. Go to [site], make sure you're logged in,
+#     click the Plasmate icon in your toolbar, and hit 'Push to Plasmate'
+#
+#  I'm watching for it now."
+
+# Long-poll until cookies arrive (blocks up to 120s)
+curl -s "http://127.0.0.1:9271/api/wait?domain=x.com&timeout=120"
+# Returns: {"ok":true,"domain":"x.com","cookies":2}
+# Or after timeout: {"ok":false,"error":"Timed out waiting for cookies"}
+```
+
+### Step 4: Browse authenticated
+```bash
+plasmate fetch --profile x.com https://x.com/notifications
+```
+
+### Key points for agents
+- The `/api/wait` endpoint blocks until cookies arrive, no polling loop needed
+- If the user has already pushed cookies before, skip straight to browsing
+- If wait times out, ask the user to try again (cookies may not have been pushed)
+- The bridge only needs to run during the cookie capture; browsing uses stored profiles
+
 ## When to Use Plasmate vs Browser Tool
 
 - **Plasmate**: Speed-critical scraping, batch page processing, token-sensitive extraction, structured data, authenticated browsing of known sites
