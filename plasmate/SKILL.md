@@ -1,6 +1,6 @@
 ---
 name: plasmate
-description: Browse the web via Plasmate, a fast headless browser engine for agents. Use when navigating websites, extracting structured content, clicking/typing on pages, scraping data, or automating web interactions. Plasmate returns a Semantic Object Model (SOM) instead of raw HTML - 10-800x smaller, optimized for LLM reasoning. Supports AWP (Agent Web Protocol) and CDP (Puppeteer/Playwright compatible). Use instead of or alongside browser tools when speed, token cost, or memory matter.
+description: Browse the web via Plasmate, a fast headless browser engine for agents. Use when navigating websites, extracting structured content, clicking/typing on pages, scraping data, or automating web interactions. Plasmate returns a Semantic Object Model (SOM) instead of raw HTML - 10-800x smaller, optimized for LLM reasoning. Supports AWP (Agent Web Protocol) and CDP (Puppeteer/Playwright compatible). Includes authenticated browsing with encrypted cookie profiles for X, GitHub, LinkedIn, and any site.
 ---
 
 # Plasmate - Browser Engine for Agents
@@ -9,6 +9,7 @@ Plasmate compiles HTML into a Semantic Object Model (SOM). 50x faster than Chrom
 
 - **Docs**: https://docs.plasmate.app
 - **Install**: `curl -fsSL https://plasmate.app/install.sh | sh`
+- **Extension**: https://github.com/plasmate-labs/plasmate-extension
 
 ## Protocols
 
@@ -27,11 +28,20 @@ plasmate fetch <url>
 
 Returns SOM JSON: regions, interactive elements with stable IDs, extracted content.
 
+### Authenticated Fetch
+
+```bash
+plasmate fetch --profile x.com https://x.com/home
+```
+
 ### Server Mode
 
 ```bash
 # AWP (recommended)
 plasmate serve --protocol awp --port 9222
+
+# With auth profile loaded
+plasmate serve --profile x.com --port 9222
 
 # CDP (Puppeteer compatible)
 plasmate serve --protocol cdp --port 9222
@@ -53,6 +63,9 @@ python3 scripts/awp-browse.py type "https://example.com" --ref "e5" --text "sear
 
 # Extract structured data (JSON-LD, OpenGraph, tables)
 python3 scripts/awp-browse.py extract "https://example.com"
+
+# Scroll
+python3 scripts/awp-browse.py scroll "https://example.com" --direction down
 ```
 
 ## CDP Usage (Puppeteer)
@@ -68,24 +81,69 @@ await page.goto('https://example.com');
 const content = await page.content();
 ```
 
-## Authenticated Sessions
+## Authenticated Browsing
 
-For sites requiring login (X, banking, enterprise SaaS):
+Plasmate supports encrypted cookie profiles for browsing sites that require login.
+
+### How it works
+
+1. User logs into a site in Chrome
+2. The Plasmate Chrome extension grabs auth cookies
+3. Cookies are pushed to the local bridge server (or copied as CLI command)
+4. Plasmate stores them encrypted (AES-256-GCM) on disk
+5. Agent browses the site authenticated using the stored profile
+
+### Cookie bridge (extension integration)
 
 ```bash
-# Store auth cookies (grab from browser dev tools or extension)
-plasmate auth <domain> --cookies "name1=val1; name2=val2"
-
-# X/Twitter specifically
-plasmate auth x.com --ct0 "<ct0_value>" --auth-token "<auth_token_value>"
-
-# Use stored profile in server mode
-plasmate serve --profile x.com
+# Start the bridge server (extension pushes cookies here)
+plasmate auth serve
+# Listens on 127.0.0.1:9271
+# GET  /api/status  - version + stored profiles
+# POST /api/cookies - store cookies from extension
 ```
 
-Cookie profiles stored in `~/.plasmate/profiles/<domain>.enc` (encrypted at rest).
+### Manual cookie storage
 
-When auth tokens expire (401/403 detected), Plasmate surfaces a re-auth prompt through the protocol.
+```bash
+# Store cookies from a string
+plasmate auth set example.com --cookies "session_id=abc; csrf=xyz"
+
+# X/Twitter shorthand
+plasmate auth set x.com --ct0 "<ct0_value>" --auth-token "<auth_token_value>"
+```
+
+### Managing profiles
+
+```bash
+# List all stored profiles with expiry status
+plasmate auth list
+# ✓ x.com (2 cookies) - valid
+# ⚠ github.com (2 cookies) - expires soon
+# ✗ linkedin.com (2 cookies) - expired
+
+# Detailed info for a domain
+plasmate auth info x.com
+
+# Revoke (delete) a profile
+plasmate auth revoke x.com
+```
+
+### Expiry tracking
+
+Cookies include expiration dates. Plasmate tracks these and:
+- Shows ✓ valid, ⚠ expires soon (<24h), ✗ expired in `auth list`
+- Skips expired cookies automatically when loading profiles
+- Surfaces re-auth prompts through AWP when 401/403 is detected
+
+### Security
+
+- AES-256-GCM encryption at rest with auto-generated master key
+- Master key at `~/.plasmate/master.key` (chmod 0600)
+- Bridge only listens on localhost (127.0.0.1), never network
+- Auto-migration of legacy plaintext profiles
+
+See `references/auth-flow.md` for detailed auth documentation.
 
 ## SOM Output Structure
 
@@ -108,5 +166,5 @@ Use ref IDs from `interactive` elements for click/type actions.
 
 ## When to Use Plasmate vs Browser Tool
 
-- **Plasmate**: Speed-critical scraping, batch page processing, token-sensitive extraction, structured data gathering
+- **Plasmate**: Speed-critical scraping, batch page processing, token-sensitive extraction, structured data, authenticated browsing of known sites
 - **Browser tool**: Visual rendering needed, screenshots, complex JS SPAs requiring full Chrome engine, pixel-level interaction
