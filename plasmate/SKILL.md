@@ -64,10 +64,11 @@ git clone https://github.com/plasmate-labs/plasmate && cd plasmate && cargo buil
 
 ## Protocols
 
+- **MCP** (stdio): 11 tools - fetch_page, extract_text, open_page, navigate_to, click, type_text, select_option, scroll, evaluate, screenshot_page, close_page
 - **AWP** (native): 7 methods - navigate, snapshot, click, type, scroll, select, extract
 - **CDP** (legacy bridge): Puppeteer/Playwright compatible on port 9222
 
-Default to AWP. Use CDP only when existing Puppeteer/Playwright code needs reuse.
+Default to MCP for new integrations. Use AWP for direct protocol access. Use CDP only when existing Puppeteer/Playwright code needs reuse.
 
 ## Quick Start
 
@@ -78,6 +79,21 @@ plasmate fetch <url>
 ```
 
 Returns SOM JSON: regions, interactive elements with stable IDs, extracted content.
+
+### `pf` — fetch wrapper with token tracking
+
+`scripts/pf` is a drop-in replacement for raw `web_fetch` calls. It wraps `plasmate fetch`, logs timing + estimated token savings to `~/.plasmate/fetch-stats.jsonl`, and prints a one-line summary to stderr.
+
+```bash
+# Install once
+cp scripts/pf /usr/local/bin/pf && chmod +x /usr/local/bin/pf
+
+# Use everywhere instead of web_fetch
+pf https://docs.stripe.com/api
+# [pf] https://docs.stripe.com/api — 1368ms · 12,699 tokens (est. 95.8% savings vs raw HTML)
+```
+
+Override the stats log path: `PF_STATS_LOG=/path/to/stats.jsonl pf <url>`
 
 ### Server Mode
 
@@ -122,6 +138,40 @@ const page = await browser.newPage();
 await page.goto('https://example.com');
 const content = await page.content();
 ```
+
+## MCP Usage
+
+Run `plasmate mcp` to start an MCP server over stdio. Configure it in your agent's MCP settings:
+
+```json
+{
+  "servers": {
+    "plasmate": {
+      "command": "plasmate",
+      "args": ["mcp"],
+      "transport": "stdio"
+    }
+  }
+}
+```
+
+### Available MCP tools
+
+| Tool | Description |
+|---|---|
+| `fetch_page` | Fetch a URL, return SOM. Stateless. |
+| `extract_text` | Fetch a URL, return plain text only. Stateless. |
+| `screenshot_page` | Capture a screenshot (falls back to SOM if Chrome not available). |
+| `open_page` | Open a URL in a persistent session. Returns session ID + SOM. |
+| `navigate_to` | Navigate an existing session to a new URL. |
+| `click` | Click an element by SOM ref ID. Returns updated SOM. |
+| `type_text` | Type into a form input or textarea by SOM ref ID. |
+| `select_option` | Set a `<select>` dropdown value by ref ID + option value or label. |
+| `scroll` | Scroll the viewport or a specific element into view. |
+| `evaluate` | Run JavaScript in the page context. |
+| `close_page` | Close a session and free resources. |
+
+All stateful tools (`open_page` through `close_page`) share session state — navigate, interact, extract across multiple steps without losing context.
 
 ## Authenticated Browsing (Optional)
 
@@ -199,6 +249,19 @@ Use ref IDs from `interactive` elements for click/type actions.
 | Memory (100 pages) | ~30 MB | ~20 GB |
 | Output size | SOM (10-800x smaller) | Raw HTML |
 
+Real-world token savings (SOM vs raw HTML, 12-site benchmark):
+
+| Site | Plasmate tokens | Raw HTML tokens | Savings |
+|---|---|---|---|
+| Vercel docs | 2,206 | 556,464 | **99.6%** |
+| Stripe API docs | 12,699 | 301,604 | **95.8%** |
+| Next.js docs | 15,350 | 198,307 | **92.3%** |
+| Stack Overflow | 41,699 | 289,090 | **85.6%** |
+| Wikipedia article | 25,448 | 147,538 | **82.8%** |
+| GitHub repo page | 17,869 | 91,994 | **80.6%** |
+
+Plasmate is most effective on SPAs and content-heavy pages. For already-minimal HTML (Hacker News, simple static pages), raw fetch may produce comparable token counts.
+
 ## Agent-Driven Auth Flow (Guided Setup)
 
 When a user asks you to browse a site that requires login and no profile exists:
@@ -249,5 +312,8 @@ plasmate fetch --profile x.com https://x.com/notifications
 
 ## When to Use Plasmate vs Browser Tool
 
-- **Plasmate**: Speed-critical scraping, batch page processing, token-sensitive extraction, structured data, authenticated browsing of known sites
-- **Browser tool**: Visual rendering needed, screenshots, complex JS SPAs requiring full Chrome engine, pixel-level interaction
+- **`pf` / `plasmate fetch`**: One-shot URL fetching — replaces `web_fetch` for any URL where token count matters
+- **`plasmate mcp`**: Multi-step browsing (login flows, form filling, pagination) — use MCP tools via your agent's tool config
+- **AWP server**: Direct protocol access or scripted batch processing via `scripts/awp-browse.py`
+- **CDP server**: Existing Puppeteer/Playwright code that needs reuse without rewriting
+- **Browser tool (Chrome)**: Screenshots, pixel-level interaction, sites that actively block headless agents
