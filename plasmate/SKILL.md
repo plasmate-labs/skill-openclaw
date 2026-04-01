@@ -64,7 +64,7 @@ git clone https://github.com/plasmate-labs/plasmate && cd plasmate && cargo buil
 
 ## Protocols
 
-- **MCP** (stdio): 11 tools - fetch_page, extract_text, open_page, navigate_to, click, type_text, select_option, scroll, evaluate, screenshot_page, close_page
+- **MCP** (stdio): 13 tools - fetch_page, extract_text, open_page, navigate_to, click, type_text, select_option, scroll, toggle, clear, evaluate, screenshot_page, close_page
 - **AWP** (native): 7 methods - navigate, snapshot, click, type, scroll, select, extract
 - **CDP** (legacy bridge): Puppeteer/Playwright compatible on port 9222
 
@@ -168,6 +168,8 @@ Run `plasmate mcp` to start an MCP server over stdio. Configure it in your agent
 | `type_text` | Type into a form input or textarea by SOM ref ID. |
 | `select_option` | Set a `<select>` dropdown value by ref ID + option value or label. |
 | `scroll` | Scroll the viewport or a specific element into view. |
+| `toggle` | Toggle a checkbox, radio button, or details/summary widget. |
+| `clear` | Clear the value of a text input or textarea. |
 | `evaluate` | Run JavaScript in the page context. |
 | `close_page` | Close a session and free resources. |
 
